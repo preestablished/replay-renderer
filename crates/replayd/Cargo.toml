@@ -1,0 +1,9 @@
+[package]
+name = "replayd"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+replay-proto = { path = "../replay-proto" }
+replay-types = { path = "../replay-types" }
