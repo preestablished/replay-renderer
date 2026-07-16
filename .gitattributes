@@ -1,0 +1,5 @@
+# Byte-exact committed fixtures: never text-normalize.
+tests/fixtures/** binary
+*.dhilog binary
+*.bin binary
+*.rfp binary

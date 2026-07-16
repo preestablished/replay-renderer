@@ -2,11 +2,16 @@ name: ci
 on:
   pull_request:
   push:
+    branches: [main]
 jobs:
   rust:
     strategy:
       matrix:
-        runner: [ubuntu-latest]
+        # aarch64 leg per M0 acceptance ("cargo build on x86_64 and aarch64").
+        # ubuntu-24.04-arm is free for public repos only (see state-scorer's
+        # ci.yaml note); if unavailable, record pending CI debt in the
+        # resolution note (06-resolution.md) — do not silently drop it.
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -17,9 +22,16 @@ jobs:
           repository: ${{ github.repository_owner }}/control-plane
           path: control-plane
       - uses: dtolnay/rust-toolchain@stable
+      # M3's fallback lane: libx264 + ffprobe must exist in CI.
+      # ffmpeg is needed on the Spark only for NVENC; CI exercises libx264.
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: cargo fmt --all -- --check
+        working-directory: repo
+      - run: cargo clippy --workspace --all-targets -- -D warnings
         working-directory: repo
       - run: cargo build --workspace
         working-directory: repo
       - run: cargo test --workspace
+        working-directory: repo
+      - run: cargo run -p xtask -- regen-fixtures --check
         working-directory: repo

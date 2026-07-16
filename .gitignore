@@ -24,3 +24,6 @@ target
 .dolt/
 *.db
 .beads-credential-key
+
+# /review skill working artifacts (adjudications live in the plan review log)
+reviews/

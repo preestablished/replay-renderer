@@ -1,0 +1,17 @@
+{
+  "experiment_id": "exp-fixture-01",
+  "goal_node_id": 55,
+  "guest_image_id": "c0e417bb96967c92d7960bf7c34f7dae6e44a0e42615b667b8cc4d03dc7b11bf",
+  "machine_config_hash": "7d8fc842cfd67537c020ba08be6a79d4bb504d85646370b53b44e08556eeadc0",
+  "clock": { "num": 1, "den": 1 },
+  "fps": { "num": 6010, "den": 100 },
+  "determinism_class": { "cpu_model": "fixture-cpu", "microcode": "0x0", "host_kernel": "fixture-kernel", "vmm_version": "0.0.0-fixture" },
+  "nodes": [
+    { "node_id": 0, "parent_id": null, "snapshot_ref": "b397cf7cd1a6094b46de1041e6806b4d8c00fda90befabec4fbb0537ddecd6a4", "input_log_id": null, "segment_file": null, "attrs": {} },
+    { "node_id": 7, "parent_id": 0, "snapshot_ref": "7f9d9ba7a23312445855e233aa13526c1f5e65f6ac1ce8df54ece7b82ca60089", "input_log_id": "dc1c780aab1e80c1e7d2b297b45169a66a3f6a554c7fbb6befc191cd11f377a8", "segment_file": "segment_1.dhilog", "attrs": { "state_hash": "5ef5e550413554803fa80af9a5998f2e01654e856642582018bd777ae83ce28f" } },
+    { "node_id": 13, "parent_id": 7, "snapshot_ref": "550fcaf6f26894ee072959b44a2420bd89c42006bd45ba41cba1060f4d989be1", "input_log_id": "18025c7272c073bc0e6d1a6cc8091236b9a486e77b291b848140e18023d3ce4d", "segment_file": "segment_2.dhilog", "attrs": { "state_hash": "cf780da906ac3105ad75b334850c2ef2bf89a1ae31bcdd117efcaedc67200643" } },
+    { "node_id": 21, "parent_id": 13, "snapshot_ref": "35b429b2d8d2513a375d3f703b22e83ec8b9a985e259aa055e788c0bc98a70df", "input_log_id": "f1a9b0a4206f2d2c9065244221200f549a2b5ae9698ba9b2583b8b4f2c5f8ae1", "segment_file": "segment_3.dhilog", "attrs": { "state_hash": "801d16434f10ec63da0c5c571b3d49349c471f509e1ffa0401cc209372f8152e" } },
+    { "node_id": 34, "parent_id": 21, "snapshot_ref": "5efbdfb0287e30890844549cc156fa44dd7008fe027885a360cfa577b551865d", "input_log_id": "9400747e45781148139a254516726166eabd035ee29d685b757c25c971f2435f", "segment_file": "segment_4.dhilog", "attrs": { "state_hash": "c4091db59f132ae5905deeed206473e43cb882dbb3c30189d245c7e87412bf1b" } },
+    { "node_id": 55, "parent_id": 34, "snapshot_ref": "261165a654200b6111e0876aaaa6302170da047e6961505453b1e43ff35bcbf5", "input_log_id": "97f97651062b612a8a84fc07f870d583ecca3cf06e2ada93692365e97205bfdd", "segment_file": "segment_5.dhilog", "attrs": { "state_hash": "4aa8d716124e95e15c47b8e3a66fc3f97a425d4a3701a359bf4b7ec0d03c9c88" } }
+  ]
+}
