@@ -64,6 +64,12 @@ impl GuestSim {
         self.icount
     }
 
+    /// The raw FNV state register (M2's mock synthesizes deterministic
+    /// register diffs from it).
+    pub fn register(&self) -> u64 {
+        self.fnv
+    }
+
     /// Chain value after the most recent epoch-boundary fold (the payload of
     /// an `EPOCH_HASH` record at that boundary).
     pub fn epoch_chain(&self) -> [u8; 32] {

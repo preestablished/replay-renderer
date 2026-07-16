@@ -1,0 +1,144 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://determinism.dev/schemas/divergence-report.v2.schema.json",
+  "title": "Divergence report v2 (replay-renderer API.md §2.5)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "job_id",
+    "source_job_id",
+    "experiment_id",
+    "node_id",
+    "bad_child_node_id",
+    "edge",
+    "segment_index",
+    "classification",
+    "offset_kind",
+    "expected_hash",
+    "actual_hash",
+    "runs_used",
+    "budget_exhausted",
+    "run_faults",
+    "versions",
+    "dilog_artifact",
+    "repro_cmd"
+  ],
+  "properties": {
+    "version": { "const": 2 },
+    "job_id": { "$ref": "#/definitions/ulid" },
+    "source_job_id": { "$ref": "#/definitions/ulid" },
+    "experiment_id": { "type": "string", "minLength": 1 },
+    "node_id": { "$ref": "#/definitions/u64" },
+    "bad_child_node_id": { "$ref": "#/definitions/u64" },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parent", "child"],
+      "properties": {
+        "parent": { "$ref": "#/definitions/u64" },
+        "child": { "$ref": "#/definitions/u64" }
+      }
+    },
+    "segment_index": { "type": "integer", "minimum": 1 },
+    "classification": {
+      "enum": ["REPLAY_NONDETERMINISTIC", "RECORDED_DIVERGENCE"]
+    },
+    "offset_kind": { "enum": ["EXACT_ICOUNT", "ICOUNT_WINDOW"] },
+    "icount": { "$ref": "#/definitions/u64" },
+    "icount_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to"],
+      "properties": {
+        "from": { "$ref": "#/definitions/u64" },
+        "to": { "$ref": "#/definitions/u64" }
+      }
+    },
+    "rip_expected": { "$ref": "#/definitions/hex" },
+    "rip_actual": { "$ref": "#/definitions/hex" },
+    "reg_diff": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "expected", "actual"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "expected": { "$ref": "#/definitions/hex" },
+          "actual": { "$ref": "#/definitions/hex" }
+        }
+      }
+    },
+    "diff_page_idx": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/u64" }
+    },
+    "suspected_cause": { "type": "string" },
+    "expected_hash": { "$ref": "#/definitions/b3hash" },
+    "actual_hash": { "$ref": "#/definitions/b3hash" },
+    "runs_used": { "type": "integer", "minimum": 0 },
+    "budget_exhausted": { "type": "boolean" },
+    "run_faults": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["icount", "kind", "detail"],
+        "properties": {
+          "icount": { "$ref": "#/definitions/u64" },
+          "kind": { "type": "string", "minLength": 1 },
+          "detail": { "type": "string" }
+        }
+      }
+    },
+    "versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["replay_renderer", "hypervisor", "dhilog"],
+      "properties": {
+        "replay_renderer": { "type": "string", "minLength": 1 },
+        "hypervisor": { "type": "string", "minLength": 1 },
+        "dhilog": { "const": "1.0" }
+      }
+    },
+    "dilog_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["registry_id", "blake3"],
+      "properties": {
+        "registry_id": { "type": "string", "minLength": 1 },
+        "blake3": { "$ref": "#/definitions/b3hash" }
+      }
+    },
+    "repro_cmd": { "type": "string", "minLength": 1 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "offset_kind": { "const": "EXACT_ICOUNT" } } },
+      "then": {
+        "required": ["icount"],
+        "not": { "required": ["icount_window"] }
+      }
+    },
+    {
+      "if": { "properties": { "offset_kind": { "const": "ICOUNT_WINDOW" } } },
+      "then": {
+        "required": ["icount_window"],
+        "not": { "required": ["icount"] }
+      }
+    },
+    {
+      "if": { "required": ["rip_expected"] },
+      "then": {
+        "required": ["rip_actual", "reg_diff", "diff_page_idx", "suspected_cause"]
+      }
+    }
+  ],
+  "definitions": {
+    "u64": { "type": "integer", "minimum": 0 },
+    "hex": { "type": "string", "pattern": "^0x[0-9a-f]+$" },
+    "b3hash": { "type": "string", "pattern": "^b3:[0-9a-f]{64}$" },
+    "ulid": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$" }
+  }
+}

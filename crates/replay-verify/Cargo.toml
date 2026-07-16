@@ -1,0 +1,23 @@
+[package]
+name = "replay-verify"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+# Test-only MockHypervisor (wraps the dev-only replay-mockhv toy guest).
+# Never enabled by shipped bins.
+mock = ["dep:replay-mockhv"]
+
+[dependencies]
+replay-types = { path = "../replay-types" }
+replay-splice = { path = "../replay-splice" }
+replay-mockhv = { path = "../replay-mockhv", optional = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+blake3 = { workspace = true }
+jsonschema = "0.33"

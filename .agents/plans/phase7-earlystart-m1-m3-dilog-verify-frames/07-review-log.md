@@ -52,3 +52,25 @@ and found them exact.
 Post-fix verification: full test suite + clippy green; both fuzz targets
 90 s clean (2.1M + 466k execs, zero findings); `regen-fixtures --check`
 clean.
+
+## Package 03 — M2: replay-verify (2026-07-16)
+
+Reviewers: Claude Opus ×2, independent (`reviews/main-2026-07-16-pkg03/`).
+Verdicts: APPROVE + approve-with-nits. 0 critical, 2 important, ~9
+suggestions. Both accepted all four documented deviations (VerifyOpts
+segment_index; RunBudget through the trait; Phase 1 with bisect=false;
+InjectedDefect as the mock's ground-truth oracle).
+
+| Finding | Adjudication | Reason |
+|---|---|---|
+| In-epoch narrowing seeds at `lo+1`: a divergence icount that is an exact epoch-boundary multiple lands after that boundary's chain fold, so the first divergent icount is `lo` itself and the search would report E+1 (opus2, Important; latent — fixture E=48211 is not boundary-aligned) | **accept** | Real logic bug. Seed changed to `(lo, hi)`; regression test `recorded_skew_on_epoch_boundary_still_bisects_exactly` (in-memory segment, skew at 8192) added. |
+| Fallback populates rip_*/reg_diff/suspected_cause though native bisection didn't run — API.md §2.5 says "absent otherwise"; plan §5 wants the page diff (opus2, Important) | **accept (split)** | §2.5 wins for the CPU-level block (absent); §6's fallback evidence keeps `diff_page_idx` populated alone. Test asserts both directions. |
+| Nondet Phase-1 window is whole-segment — coarser than §6's localized window (opus1, tracking note) | **accept (defer)** | Consequence of the bisect=false Phase-1 deviation; correct per plan's full-segment-runs wording. M4 reconciliation item for the resolution note. |
+| Budget test never exercises partial narrowing (opus2) | **accept** | Added `budget_death_mid_narrowing_keeps_partial_window` (max_runs 10 dies mid-search; window still contains E). |
+| `run_to_icount` hardcodes segment_index 0 ⇒ defect folds never apply to probes (opus1) | **reject (doc)** | Trait signature is fixed; probes replay honestly, which is what the fallback end-state diff wants. Documented at the call site. |
+| Exact-icount test feeds E to the mock's own oracle (opus2, tautology note) | **reject** | Inherent to the mock-as-ground-truth design (mock.rs header explains); the fixture's recorded hashes independently pin the writer side. |
+| Nondet window "contains 48211" assertion near-trivial (opus2) | **reject** | True but harmless; the load-bearing asserts are classification + run counter. Real-hv M4 tests will sharpen it. |
+
+Post-fix verification: 9/9 M2 tests green; clippy (incl. `--features
+mock`) clean; committed fixtures untouched; no `xtask/src` changes in this
+package's diff.

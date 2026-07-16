@@ -33,6 +33,10 @@ jobs:
         working-directory: repo
       - run: cargo test --workspace
         working-directory: repo
+      # The workspace run never enables the mock feature — the M2 suite
+      # would silently never run in CI without this explicit step.
+      - run: cargo test -p replay-verify --features mock
+        working-directory: repo
       - run: cargo run -p xtask -- regen-fixtures --check
         working-directory: repo
 
