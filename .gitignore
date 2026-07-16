@@ -27,3 +27,9 @@ target
 
 # /review skill working artifacts (adjudications live in the plan review log)
 reviews/
+
+# cargo-fuzz: generated corpus entries and crash artifacts stay local;
+# committed seeds under fuzz/corpus were git add -f-ed.
+fuzz/corpus/
+fuzz/artifacts/
+fuzz/coverage/

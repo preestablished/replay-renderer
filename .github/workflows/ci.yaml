@@ -35,3 +35,22 @@ jobs:
         working-directory: repo
       - run: cargo run -p xtask -- regen-fixtures --check
         working-directory: repo
+
+  # Short fuzz smoke over the two replay-splice targets (M1 accept-when).
+  # state-scorer's fuzz-smoke job is the template.
+  fuzz-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: repo
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/control-plane
+          path: control-plane
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz --locked
+      - run: cargo +nightly fuzz run dilog_reader -- -max_total_time=90
+        working-directory: repo
+      - run: cargo +nightly fuzz run dhilog_validator -- -max_total_time=90
+        working-directory: repo

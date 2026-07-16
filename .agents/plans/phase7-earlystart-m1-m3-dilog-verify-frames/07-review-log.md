@@ -27,3 +27,28 @@ suggestions.
 
 Post-fix verification: fmt/clippy/test/`regen-fixtures --check` all green;
 fixture bytes unchanged by the fixes (source-only edits).
+
+## Package 02 — M1: replay-splice (2026-07-16)
+
+Reviewers: Claude Opus ×2, independent (`reviews/main-2026-07-16-pkg02/`).
+Verdicts: REQUEST_CHANGES + approve-with-follow-ups. 0 critical (as filed),
+2 important, ~12 suggestions. Both reviewers independently verified the
+`.dilog` v2 / DHILOG byte layouts field-by-field against the owner specs
+and found them exact.
+
+| Finding | Adjudication | Reason |
+|---|---|---|
+| `DilogContainer::read` panics on crafted hash-valid container: `pad8(blob_end)` overflows / OOB slice because the bound check tested the wrapped `padded_end` (opus, blocker) | **accept** | Real attacker-constructible panic (`.dilog` is untrusted third-party input). Fixed: `blob_end > footer_start` checked before `pad8`; regression test `reader_rejects_huge_blob_len_without_panicking` added. |
+| `validate_structure` never enforces `payload_len ≤ 4096` / NET_RX ≤ 2048 (opus2, Important; opus suggestion) | **accept** | Frozen-format bounds (hypervisor API.md §3.2/§3.3); this crate is the validation boundary. Added as R4 checks. |
+| R1 mixed-version branch unreachable with a one-element supported set; `r1_mixed…` test actually trips the unsupported branch (opus2, Important) | **accept (doc)** | True by construction — any mix with {0x0100} contains an unsupported version, which IS the R1 verdict. Branch kept for a future second supported version; documented in code. Test kept: it pins the accept-when line's observable behavior. |
+| Redundant per-segment container-flag check (opus) | **accept** | Removed; the final bit0 == AND-over-segments canonicality check covers both directions. |
+| `seq`-vs-index compare truncates at u32::MAX records (opus2) | **accept** | Guard added (R5) — count beyond u32 can never satisfy seq == index. |
+| R4 missing-END test can't distinguish sub-check (opus2) | **accept** | Test now asserts the detail names END. |
+| `input_log_id`-missing mapped to R3 (opus, opus2) | **reject (keep)** | Documented decision: a committed edge always has a sealed stored log (H8); a row without one is not a committed edge — lineage class. Revisit if API.md ever assigns it a code. |
+| Fixture-coupled corruption indices in tests (opus2) | **reject** | Fixture bytes are frozen by `--check`; indices are stable by construction. |
+| Drop control-plane checkout from fuzz-smoke CI job (opus, opus2) | **reject** | Building any workspace member resolves the whole workspace, incl. `replay-proto` → `determinism-proto` path dep on the sibling checkout. |
+| Happy-path test derives some expectations rather than literals (opus) | **reject** | Structure sizes (160/152/pad8) are literal; hashes/refs come from `path.json`, the committed source of truth — re-deriving 32-byte literals by hand adds noise, not strength. |
+
+Post-fix verification: full test suite + clippy green; both fuzz targets
+90 s clean (2.1M + 466k execs, zero findings); `regen-fixtures --check`
+clean.

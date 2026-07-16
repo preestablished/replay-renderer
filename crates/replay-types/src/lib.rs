@@ -38,6 +38,17 @@ pub struct Icount(pub u64);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct JobId(pub [u8; 16]);
 
+/// The hypervisor host's determinism-class tuple (hypervisor API.md §2.8);
+/// published in `.dilog` META and artifact metadata — re-verification
+/// hard-requires a class-matching host.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct DeterminismClass {
+    pub cpu_model: String,
+    pub microcode: String,
+    pub host_kernel: String,
+    pub vmm_version: String,
+}
+
 /// Guest framebuffer geometry. Not invented here — read from
 /// reference-workload's guest manifest via tree-root attrs (ARCHITECTURE §1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
