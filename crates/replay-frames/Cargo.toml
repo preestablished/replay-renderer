@@ -1,0 +1,16 @@
+[package]
+name = "replay-frames"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+replay-types = { path = "../replay-types" }
+replay-splice = { path = "../replay-splice" }
+blake3 = { workspace = true }
+lz4_flex = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+image = { workspace = true }
+replay-mockhv = { path = "../replay-mockhv" }

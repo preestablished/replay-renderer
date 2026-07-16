@@ -7,4 +7,9 @@ publish = false
 
 [dependencies]
 blake3 = { workspace = true }
+image = { workspace = true }
+replay-encode = { path = "../crates/replay-encode" }
+replay-frames = { path = "../crates/replay-frames" }
 replay-mockhv = { path = "../crates/replay-mockhv" }
+replay-overlay = { path = "../crates/replay-overlay" }
+replay-types = { path = "../crates/replay-types" }

@@ -1,0 +1,16 @@
+[package]
+name = "replay-encode"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+replay-types = { path = "../replay-types" }
+replay-frames = { path = "../replay-frames" }
+replay-overlay = { path = "../replay-overlay" }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["process", "io-util", "time"] }
+image = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

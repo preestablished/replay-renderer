@@ -74,3 +74,28 @@ InjectedDefect as the mock's ground-truth oracle).
 Post-fix verification: 9/9 M2 tests green; clippy (incl. `--features
 mock`) clean; committed fixtures untouched; no `xtask/src` changes in this
 package's diff.
+
+## Package 04 — M3: frames/overlay/encode (2026-07-16)
+
+Reviewers: Claude Opus ×2, independent (`reviews/main-2026-07-16-pkg04/`).
+Verdicts: APPROVE + approve-with-changes. 0 critical, 2 important (one
+shared), ~12 suggestions. Both verified: `.rfp` byte layout vs API.md
+§2.3, exact-integer overlay determinism (no float/wall-clock; blend
+accumulator can't overflow), HUD fold-at-icount semantics, ffmpeg args vs
+§7.2–§7.4, purity (no tokio/tonic in pure crates, no sockets in encode).
+
+| Finding | Adjudication | Reason |
+|---|---|---|
+| `vns_at` unguarded u64 subtractions can panic on boundary/crafted headers, and the sole normative M3 formula had zero test coverage (both, Important) | **accept** | `saturating_sub` on both + `clock_den.max(1)`; `vns_formula_pinned` unit test added (end/mid/non-unit-clock/degenerate cases). |
+| `.rfp` reader returns `Err(UnknownComp)` mid-parse, contradicting the "torn spool stays forensically readable" contract (opus2, Important) | **accept** | Bad comp byte now degrades to `Torn` at the damage point; regression assert added to `rfp_torn_pack_refused_for_resume`. |
+| Probe fallback test vacuous if ffmpeg missing (opus) | **accept** | Test now asserts `ffmpeg -version` succeeds first. |
+| `--check` compares PNG bytes; an image-crate encoder bump can fail it without pixel drift (opus) | **accept (doc)** | Documented at the generator; lockfile pins the version; deliberate bumps regen + review. |
+| `run_capture_stdout` unbounded buffer (opus) | **accept (doc)** | Documented as test/verification-only. |
+| `held_at` linear scan per frame (opus) | **reject** | Event counts are tiny at M3; the fold semantics are the point. Revisit with real workloads in M5. |
+| H265/`Codec` mapping untested (opus) | **reject** | `mp4_args_default_quality_per_encoder` already pins libx265/`-crf 20`; the `Codec`→`EncoderChoice` mapping is M5 job-layer code that doesn't exist yet. |
+| `stills::blit` debug_assert (opus) | **reject** | Reviewer-verified invariant (≤144 tiles for any count); goldens freeze the geometry. |
+| Golden suites are self-generated — xtask and lib share the code (opus2, note) | **accept (standing)** | Known property of golden testing; defenses: hand spot-check (3 overlaid PNGs + contact sheet viewed; recorded in the bead) and the independent literal pixel anchors in `lut_edge_cases`. No `.rfp` fuzz target: the format never leaves the Intel box and the reader is total — noted, not added. |
+
+Post-fix verification: fmt/clippy/workspace tests/fixture `--check` all
+green (encode suite 8 passed + 1 NVENC-ignored; 600-frame ffprobe
+contract 601/10; MAE < 3.0; WebP lossless byte-identical).

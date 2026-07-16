@@ -276,7 +276,7 @@ pub fn generate() -> Vec<(String, Vec<u8>)> {
         .into_bytes(),
     ));
 
-    // Golden-frame natives (inputs only at this package).
+    // Golden-frame natives.
     for i in 0..GOLDEN_FRAME_COUNT {
         out.push((
             format!("tests/fixtures/golden_frames/native_{i:02}.bin"),
@@ -284,6 +284,185 @@ pub fn generate() -> Vec<(String, Vec<u8>)> {
         ));
     }
 
+    // M3 expected goldens + the 600-frame .rfp pack (plan package 04 §2).
+    out.extend(m3::generate());
+
     out.sort_by(|a, b| a.0.cmp(&b.0));
     out
+}
+
+/// M3 golden generation: expected RGB24 / ×4-upscaled / fully-overlaid PNGs
+/// for each native frame, plus the `frames.rfp` encode-test fixture.
+/// First generation was hand spot-checked (plan package 04 §2); thereafter
+/// byte-frozen — regen only via this xtask.
+///
+/// Note: `--check` compares PNG BYTES while the golden tests compare
+/// DECODED pixels — an `image`-crate PNG-encoder change can fail `--check`
+/// without any pixel drift. The lockfile pins the version; on a deliberate
+/// bump, regen + review the diff (pixels must be identical).
+mod m3 {
+    use super::*;
+    use replay_frames::rfp::{Comp, RfpHeader, RfpRecord, RfpWriter};
+    use replay_frames::{codec, scale_nn, Lut, Rgb24Frame};
+    use replay_overlay::{
+        compose, render_strip, FrameOverlayCtx, OverlayOptions, StripSpec, TimelineNode,
+    };
+    use replay_types::{FramebufferDesc, PixelFormat};
+
+    pub const RFP_FRAME_COUNT: u64 = 600;
+    pub const RFP_FRAMES_PER_SEGMENT: u64 = 120;
+
+    fn desc() -> FramebufferDesc {
+        FramebufferDesc {
+            gpa_base: 0xE000_0000,
+            width: FRAME_W as u16,
+            height: FRAME_H as u16,
+            stride_bytes: FRAME_STRIDE as u32,
+            pixel_format: PixelFormat::Rgb555Le,
+        }
+    }
+
+    fn png(frame: &Rgb24Frame) -> Vec<u8> {
+        let img = image::RgbImage::from_raw(frame.width, frame.height, frame.pixels.clone())
+            .expect("pixel buffer matches dimensions");
+        let mut bytes = Vec::new();
+        img.write_to(
+            &mut std::io::Cursor::new(&mut bytes),
+            image::ImageFormat::Png,
+        )
+        .expect("png encode");
+        bytes
+    }
+
+    /// Fixed synthetic overlay inputs per golden frame index (any
+    /// deterministic choice is valid; frozen by the goldens).
+    pub fn overlay_ctx(i: u64) -> FrameOverlayCtx {
+        FrameOverlayCtx {
+            frame_index: 1_000 + i,
+            frame_ord: i,
+            total_frames: GOLDEN_FRAME_COUNT as u64,
+            vns: 16_666_667 * i,
+            held_buttons: ((0x421 * (i + 1)) & 0xFFF) as u32,
+            node_ord: 1 + (i / 8) as u32,
+            node_total: 4,
+            node_id: [7, 13, 21, 34][(i / 8) as usize % 4],
+            frames_since_boundary: i % 8,
+            fps_num: 6010,
+            fps_den: 100,
+        }
+    }
+
+    pub fn strip_spec() -> StripSpec {
+        StripSpec {
+            width: (FRAME_W * 4) as u32,
+            s: 4,
+            total_frames: GOLDEN_FRAME_COUNT as u64,
+            nodes: vec![
+                TimelineNode {
+                    first_frame: 0,
+                    score_milli: 0,
+                },
+                TimelineNode {
+                    first_frame: 8,
+                    score_milli: 3_000,
+                },
+                TimelineNode {
+                    first_frame: 16,
+                    score_milli: 9_000,
+                },
+                TimelineNode {
+                    first_frame: 24,
+                    score_milli: 14_000,
+                },
+            ],
+        }
+    }
+
+    pub fn all_overlays() -> OverlayOptions {
+        OverlayOptions {
+            frame_counter: true,
+            input_hud: true,
+            score_timeline: true,
+            node_banner: true,
+        }
+    }
+
+    pub fn generate() -> Vec<(String, Vec<u8>)> {
+        let mut out = Vec::new();
+        let lut = Lut::for_format(PixelFormat::Rgb555Le).expect("rgb555 lut");
+        let strip = render_strip(&strip_spec());
+        let opts = all_overlays();
+        for i in 0..GOLDEN_FRAME_COUNT {
+            let native = golden_frame(i);
+            let rgb24 = lut.convert(&native, &desc()).expect("convert");
+            let up4 = scale_nn(&rgb24, 4);
+            let mut overlaid = up4.clone();
+            compose(
+                &mut overlaid,
+                4,
+                &overlay_ctx(i as u64),
+                &opts,
+                Some(&strip),
+            );
+            out.push((
+                format!("tests/fixtures/golden_frames/expected/rgb24_{i:02}.png"),
+                png(&rgb24),
+            ));
+            out.push((
+                format!("tests/fixtures/golden_frames/expected/up4_{i:02}.png"),
+                png(&up4),
+            ));
+            out.push((
+                format!("tests/fixtures/golden_frames/expected/overlaid_{i:02}.png"),
+                png(&overlaid),
+            ));
+        }
+
+        // frames.rfp: 600 lz4 frames cycling the 32 patterns; 5 synthetic
+        // segments of 120 frames with a monotone per-segment icount grid.
+        // The header carries the DHILOG vns clock (1/1) — the demo fps
+        // 6010/100 is a test/job parameter, never stuffed into these fields
+        // (API.md §2.3 note).
+        let mut job_id = [0u8; 16];
+        job_id.copy_from_slice(&blake3::hash(b"fixture-rfp-job").as_bytes()[..16]);
+        let mut writer = RfpWriter::new(&RfpHeader {
+            flags: 0,
+            desc: desc(),
+            clock_num: 1,
+            clock_den: 1,
+            job_id,
+        })
+        .expect("rfp header");
+        for j in 0..RFP_FRAME_COUNT {
+            let native = golden_frame((j % GOLDEN_FRAME_COUNT as u64) as usize);
+            writer.push(&RfpRecord {
+                frame_index: 1_000 + j,
+                segment_index: (1 + j / RFP_FRAMES_PER_SEGMENT) as u32,
+                comp: Comp::Lz4,
+                icount: 500 + 512 * (j % RFP_FRAMES_PER_SEGMENT),
+                bytes: codec::compress_frame(&native),
+            });
+        }
+        out.push(("tests/fixtures/frames.rfp".to_string(), writer.finish(true)));
+
+        // Stills goldens: contact sheet + thumb strip over the 32 RGB24
+        // frames (1× native — ARCHITECTURE §7.4).
+        let rgb24_frames: Vec<Rgb24Frame> = (0..GOLDEN_FRAME_COUNT)
+            .map(|i| lut.convert(&golden_frame(i), &desc()).expect("convert"))
+            .collect();
+        let pairs: Vec<(u64, &Rgb24Frame)> = rgb24_frames
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (1_000 + i as u64, f))
+            .collect();
+        out.push((
+            "tests/fixtures/golden_frames/expected/contact_sheet.png".to_string(),
+            png(&replay_encode::stills::contact_sheet(&pairs)),
+        ));
+        out.push((
+            "tests/fixtures/golden_frames/expected/thumb_strip.png".to_string(),
+            png(&replay_encode::stills::thumb_strip(&pairs)),
+        ));
+        out
+    }
 }

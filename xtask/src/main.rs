@@ -60,15 +60,10 @@ fn regen_fixtures(check: bool) -> ExitCode {
         // is the single freshness gate for the whole committed set.
         let known: std::collections::BTreeSet<&str> =
             generated.iter().map(|(rel, _)| rel.as_str()).collect();
-        for dir in [
-            "tests/fixtures/fixture_tree",
-            "tests/fixtures/golden_frames",
-        ] {
-            for rel in walk_files(&root, dir) {
-                if !known.contains(rel.as_str()) {
-                    eprintln!("UNKNOWN: {rel} is not produced by regen-fixtures");
-                    bad += 1;
-                }
+        for rel in walk_files(&root, "tests/fixtures") {
+            if !known.contains(rel.as_str()) {
+                eprintln!("UNKNOWN: {rel} is not produced by regen-fixtures");
+                bad += 1;
             }
         }
         if bad > 0 {
