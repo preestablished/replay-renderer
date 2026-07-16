@@ -116,3 +116,24 @@ covered all code boundaries.
 
 30 other claims verified exactly (SHAs, CI legs, test names, drift items,
 font provenance, proto-stub status).
+
+## Final whole-delivery review (2026-07-16, post-handback)
+
+User-requested second-pass review of the complete e08a0ee..9070bcd
+delivery by two fresh reviewers with disjoint lenses
+(`reviews/main-2026-07-16-final/`): a holistic accept-when/spec/seam audit
+(APPROVE — walked every checklist item in packages 01–05 + §M1–§M3;
+**no silently-missed item**; all cross-package seams verified) and an
+adversarial cross-crate pass (REQUEST_CHANGES — one reproduced panic).
+
+| Finding | Adjudication | Reason |
+|---|---|---|
+| Composed-path panic: an EPOCH_HASH record with a well-framed SHORT payload passes R4/R5 (AUX payloads are opaque), and MockHypervisor's native-bisection epoch table sliced `payload[8..40]` unchecked — reproduced (`bisect()` panics when an earlier epoch mismatch makes the honest loop break before its own length guard) (adversarial, Important) | **accept** | Table collection now filters `payload.len() == 40` (mirrors the honest-loop guard; skipping only coarsens the window). Regression test `bisection_survives_short_epoch_hash_payload` builds the exact input and asserts a report, not a panic. Noted for M4: do not reuse the collect-then-slice shape in the real adapter. |
+| `scale_nn` is pub and overflows `width*s` on arbitrary `s` (adversarial, Suggestion) | **accept** | `checked_mul().expect(...)` — loud panic beats silent wrap in release; callers still derive `s` from `select_factor`. |
+| `decompress_frame` size-prefix allocation amplifiable (adversarial, Suggestion) | **reject** | `.rfp` is an Intel-local spool that never crosses trust boundaries; the expected-length check rejects wrong sizes. Revisit if the codec is ever fed remote bytes (M5 stream). |
+| Plain `cargo tree -p replay-verify` shows tokio via jsonschema's DEV-dep resolver stack — reads like a purity regression (holistic, Suggestion) | **accept** | `jsonschema` pinned `default-features = false` (drops the remote-$ref reqwest/tokio stack); even the dev tree is now 0 tokio/tonic. Schema test unaffected (local schema). |
+| Duplicated fps/geometry literals across xtask and tests; bare `48_211` in the nondet test (holistic, Suggestions) | **reject** | The xtask/test duplication is deliberate (a runtime import would hide generator drift; the committed PNGs are the bridge — documented at both sites). The nondet `48_211` is the injected value itself, not fixture-derived data. |
+
+Post-fix verification: fmt/clippy (workspace + mock) clean; full workspace
+suite + M2 mock suite (now 10/10) + `regen-fixtures --check` green;
+dev-tree purity 0 tokio/tonic.

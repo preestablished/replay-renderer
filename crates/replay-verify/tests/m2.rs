@@ -517,3 +517,90 @@ fn divergence_report_round_trips_and_matches_schema() {
         assert!(errors.is_empty(), "schema violations: {errors:?}\n{json}");
     }
 }
+
+#[test]
+fn bisection_survives_short_epoch_hash_payload() {
+    // Final-review regression: an EPOCH_HASH record with a well-framed but
+    // SHORT payload passes R4/R5 (AUX payloads are opaque to the splice
+    // validator). If an earlier epoch already mismatches, the honest replay
+    // loop breaks before reaching the short record — but native bisection
+    // re-collects ALL epoch records and used to slice payload[8..40]
+    // unchecked, panicking. It must skip malformed entries instead.
+    let base = *blake3::hash(b"m2-shortepoch-base").as_bytes();
+    let end = *blake3::hash(b"m2-shortepoch-end").as_bytes();
+    let end_icount = 20_000u64;
+    let (mut bytes, end_hash) = write_segment(&SegmentSpec {
+        base_snapshot_id: base,
+        end_snapshot_id: end,
+        entropy_seed: [8; 32],
+        machine_config_hash: *blake3::hash(b"m2-shortepoch-mcfg").as_bytes(),
+        clock_num: 1,
+        clock_den: 1,
+        end_icount,
+        events: vec![],
+        frame_marks: vec![],
+        // Skew before the FIRST epoch boundary: every recorded epoch hash
+        // mismatches a clean replay, so the honest loop breaks at epoch 1.
+        skew_at: Some(100),
+        omit_epoch_hashes: false,
+    });
+    // Truncate the SECOND epoch record's payload from 40 to 8 bytes by
+    // rewriting its payload_len and splicing out the tail (records stay
+    // 8-aligned: 8-byte payload needs no padding), then re-seal.
+    let recs = replay_mockhv::corrupt::records(&bytes);
+    let second_epoch = recs
+        .iter()
+        .filter(|r| r.kind == 0x42)
+        .nth(1)
+        .expect("segment has >= 2 epoch records");
+    let off = second_epoch.offset;
+    bytes[off + 2..off + 4].copy_from_slice(&8u16.to_le_bytes());
+    // payload was 40 bytes (8-aligned); keep the first 8, drop 32.
+    bytes.drain(off + 24 + 8..off + 24 + 40);
+    // Fix record_count? Unchanged (same record count). Re-seal body_hash.
+    let body_hash = *blake3::hash(&bytes[256..]).as_bytes();
+    bytes[208..240].copy_from_slice(&body_hash);
+    // Renumber nothing: seq values are untouched. The segment must still
+    // pass the splice validator (this is the point of the test).
+    let segment = DhilogSegment::parse(bytes.clone()).unwrap();
+    replay_splice::dhilog::validate_structure(&segment)
+        .expect("short AUX payload is structurally valid (opaque to R4/R5)");
+
+    let tree = Tree {
+        root: PathNode {
+            node_id: NodeId(300),
+            parent_id: None,
+            snapshot_ref: SnapshotRef(base),
+            input_log_id: None,
+            attrs: NodeAttrs::default(),
+        },
+        edges: vec![(
+            PathNode {
+                node_id: NodeId(301),
+                parent_id: Some(NodeId(300)),
+                snapshot_ref: SnapshotRef(end),
+                input_log_id: Some(*blake3::hash(&bytes).as_bytes()),
+                attrs: NodeAttrs {
+                    state_hash: Some(StateHash(end_hash)),
+                },
+            },
+            segment,
+        )],
+        json: serde_json::json!({"experiment_id": "m2-shortepoch", "goal_node_id": 301}),
+    };
+    let mut hv = MockHypervisor::new(InjectedDefect::RecordedSkew {
+        segment: 1,
+        at_icount: 100,
+    });
+    // Must produce a report (no panic); the window may be coarser.
+    let report = bisect(
+        &mut hv,
+        tree.root.snapshot_ref,
+        &tree.edges[0].1,
+        StateHash(end_hash),
+        &identity(&tree, 1),
+        &BisectOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(report.classification, Classification::RecordedDivergence);
+}

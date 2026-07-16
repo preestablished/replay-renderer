@@ -20,4 +20,7 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 blake3 = { workspace = true }
-jsonschema = "0.33"
+# default-features off: drops the remote-$ref resolver (reqwest/tokio
+# stack) so even the DEV tree stays free of network crates — the schema
+# test validates a local, self-contained schema.
+jsonschema = { version = "0.33", default-features = false }

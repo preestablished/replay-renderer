@@ -322,10 +322,18 @@ impl HypervisorReplay for MockHypervisor {
         // ---- Native bisection (mirrors dh-verify's shape) ----
         // 1. Binary-search the recorded EPOCH_HASH records to the first bad
         //    epoch; each replayed-chain probe is one budgeted run.
+        // Malformed EPOCH_HASH payloads are skipped, mirroring the honest
+        // loop's length guard: R4/R5 treat AUX payloads as opaque, so a
+        // well-formed-but-short record CAN reach this point (final-review
+        // finding: the honest loop may break on an earlier bad epoch before
+        // ever seeing it). Skipping only coarsens the window — never a
+        // panic.
         let epochs: Vec<(u64, u64, [u8; 32])> = segment
             .records()
             .filter_map(|item| item.ok())
-            .filter(|(rec, _)| rec.is_aux() && rec.kind == KIND_EPOCH_HASH)
+            .filter(|(rec, _)| {
+                rec.is_aux() && rec.kind == KIND_EPOCH_HASH && rec.payload.len() == 40
+            })
             .map(|(rec, _)| {
                 (
                     u64::from_le_bytes(rec.payload[0..8].try_into().expect("8 bytes")),

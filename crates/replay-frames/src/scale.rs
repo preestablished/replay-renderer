@@ -18,8 +18,16 @@ pub fn scale_nn(frame: &Rgb24Frame, s: u32) -> Rgb24Frame {
     if s == 1 {
         return frame.clone();
     }
-    let out_w = frame.width * s;
-    let out_h = frame.height * s;
+    // Loud on overflow instead of wrapping in release: callers derive `s`
+    // from select_factor, but the fn is pub (final-review hardening).
+    let out_w = frame
+        .width
+        .checked_mul(s)
+        .expect("scaled width overflows u32");
+    let out_h = frame
+        .height
+        .checked_mul(s)
+        .expect("scaled height overflows u32");
     let out_row_bytes = 3 * out_w as usize;
     let mut pixels = Vec::with_capacity(out_row_bytes * out_h as usize);
     let mut row_buf = vec![0u8; out_row_bytes];
