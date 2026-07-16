@@ -99,3 +99,20 @@ accumulator can't overflow), HUD fold-at-icount semantics, ffmpeg args vs
 Post-fix verification: fmt/clippy/workspace tests/fixture `--check` all
 green (encode suite 8 passed + 1 NVENC-ignored; 600-frame ffprobe
 contract 601/10; MAE < 3.0; WebP lossless byte-identical).
+
+## Package 05 — verification sweep + resolution note (2026-07-16)
+
+Docs-only boundary (06-resolution.md). Review ran as a single Opus
+fact-check pass over every claim in the note against the repository
+(`reviews/main-2026-07-16-pkg05/factcheck.md`) — a factual-accuracy audit
+being the right shape for a handback document; the dual-reviewer cadence
+covered all code boundaries.
+
+| Finding | Adjudication | Reason |
+|---|---|---|
+| CI-runtime claim (~7–17 min/leg for the encode suite) contradicted by actual run durations (~4 min whole leg; ~1.5–2 min incremental) | **accept** | Corrected; the 7–17 min figure was the loaded local box, now labeled as such. |
+| "All five beads closed" forward-dated (wrap bead still open at review time) | **accept** | Rephrased: the wrap bead closes at this commit boundary. |
+| Final-sweep fuzz exec counts unverifiable from the repo | **accept (label)** | Already labeled "local runs"; the CI fuzz-smoke jobs are the repo-verifiable gate. |
+
+30 other claims verified exactly (SHAs, CI legs, test names, drift items,
+font provenance, proto-stub status).
